@@ -1,6 +1,6 @@
 # pymplayer
 
-pymplayer is a fork of [MplayerCtrl](https://pythonhosted.org/MplayerCtrl/)
+pymplayer is a fork of [MplayerCtrl]("https://pythonhosted.org/MplayerCtrl/")
 
 * wx was removed as a requirement
 * pep8 and no CamelCase

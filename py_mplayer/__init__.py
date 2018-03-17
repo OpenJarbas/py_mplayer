@@ -1,4 +1,4 @@
-from log import LOG
+from py_mplayer.log import LOG
 from subprocess import Popen, PIPE
 from Queue import Queue
 import sys

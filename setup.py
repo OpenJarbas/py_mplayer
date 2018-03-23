@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='py_mplayer',
-    version='',
+    version='0.1',
     packages=['py_mplayer'],
     install_requires=[
         'pyee'

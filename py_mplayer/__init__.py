@@ -1,6 +1,6 @@
 from py_mplayer.log import LOG
 from subprocess import Popen, PIPE
-from Queue import Queue
+from queue import Queue
 import sys
 from pyee import EventEmitter
 import threading
@@ -796,7 +796,7 @@ class MplayerCtrl(object):
                 self._process = Popen(args, stdin=PIPE, stdout=PIPE,
                                       stderr=PIPE, universal_newlines=True,
                                       startupinfo=self.STARTUPINFO)
-            except Exception, e:
+            except Exception as e:
                 LOG.error(e)
                 raise BuildProcessError(str(e))
             self._stdin = self._process.stdin

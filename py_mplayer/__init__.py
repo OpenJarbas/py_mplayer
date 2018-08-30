@@ -775,7 +775,7 @@ class MplayerCtrl(object):
             args.extend(mplayer_args)
         else:
             args = [self.mplayer_path, '-slave',
-                    '-noconsolecontrols', '-nofontconfig', '-idle',
+                    '-noconsolecontrols', '-idle',
                     '-msglevel', 'all=4']
         # required args
         for tup in [('-vo', self.VO_DRIVER), ('-ao', self.AO_DRIVER),
@@ -855,7 +855,6 @@ class MplayerCtrl(object):
             stostdin = u'pausing_keep %s %s\n\n' % (cmd, args)
         else:
             stostdin = u'%s %s\n\n' % (cmd, args)
-        stostdin = stostdin.encode(sys.getfilesystemencoding())
 
         self._stdin.write(stostdin)
         self._stdin.flush()

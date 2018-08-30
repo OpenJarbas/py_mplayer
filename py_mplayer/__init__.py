@@ -72,6 +72,11 @@ class MplayerStdoutEvents(threading.Thread):
                     self.mpc.ee.emit("mplayer_media_finished", {})
                     media = False
                     continue
+            elif 'icy info' in line.lower():
+                if not media:
+                    LOG.info('Now playing: ' + line)
+                    media = True
+                    continue
             elif line.lower() == 'starting playback...\n':
                 self.mpc.ee.emit("mplayer_media_started", {})
                 media = True
@@ -721,7 +726,7 @@ class MplayerCtrl(object):
             return fset
 
         # defining the properties
-        for mprop, prop_dict in cls.PROPERTIES.iteritems():
+        for mprop, prop_dict in cls.PROPERTIES.items():
             pdoc, pname = prop_dict['doc'], prop_dict['name']
             fget = property_getter(mprop)  # mprop != unicode
             # (in ascii range that's ok)
@@ -787,7 +792,7 @@ class MplayerCtrl(object):
             args.append(media_file)
 
         if self._process is None:
-            args = [unicode(arg).encode(sys.getfilesystemencoding())
+            args = [str(arg).encode(sys.getfilesystemencoding())
                     for arg in filter(None, args)]
             self.args = args
             try:
@@ -840,7 +845,7 @@ class MplayerCtrl(object):
         if not self.process_alive:
             raise NoMplayerRunning('You have first to start the mplayer,'
                                    'use Start()')
-        args = u' '.join(unicode(i).replace(u' ', u'\\ ')
+        args = u' '.join(str(i).replace(u' ', u'\\ ')
                          for i in args if not i is None)
         args.replace(u'\\', u'\\\\')  # escape escaped backslashes :D
         if self.debug:
@@ -853,6 +858,7 @@ class MplayerCtrl(object):
         stostdin = stostdin.encode(sys.getfilesystemencoding())
 
         self._stdin.write(stostdin)
+        self._stdin.flush()
 
     def _get_from_queue(self):
         if self.playing:
@@ -1169,7 +1175,6 @@ class MplayerCtrl(object):
         otherwise False'''
         if self.process_alive:
             self._run_cmd(u'quit')
-            self._stdin.flush()
             if sys.version_info[:2] > (2, 5):
                 self._process.terminate()
                 if self.process_alive:

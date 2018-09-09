@@ -4,6 +4,9 @@ from queue import Queue
 import sys
 from pyee import EventEmitter
 import threading
+from urllib.request import Request
+from urllib.request import urlopen
+from re import sub
 
 
 class BaseMplayerCtrlException(Exception):
@@ -74,13 +77,14 @@ class MplayerStdoutEvents(threading.Thread):
                     continue
             elif 'icy info' in line.lower():
                 if not media:
-                    LOG.info('Now playing: ' + line)
+                    self.mpc.ee.emit("mplayer_media_started", {"data": line.rstrip()})
                     media = True
                     continue
             elif line.lower() == 'starting playback...\n':
-                self.mpc.ee.emit("mplayer_media_started", {})
-                media = True
-                continue
+                if not media:
+                    self.mpc.ee.emit("mplayer_media_started", {})
+                    media = True
+                    continue
             else:
                 if line.upper().startswith('ANS_') and '=' in line:
                     self.queue.put_nowait(line)
@@ -821,7 +825,10 @@ class MplayerCtrl(object):
     # own events
     def on_media_started(self, evt):
         self.playing = True
-        LOG.info("media started")
+        if evt.get('data') is None:
+            LOG.info("media started")
+        else:
+            LOG.info("media started: " + str(evt['data']))
 
     def on_media_finished(self, evt):
         self.playing = False
@@ -1092,7 +1099,13 @@ class MplayerCtrl(object):
         '''Load the given file/URL, stopping playback of the current file/URL.
         If <append> is nonzero playback continues and the file/URL is
         appended to the current playlist instead.'''
-        self._run_cmd(u'loadfile', file_url, append)
+        # check for any redirects
+        file = urlopen(Request(file_url, data=None, 
+                               headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11'}))
+        http_ffmpeg_file = sub('https', 'ffmpeg://https', file.geturl())
+        if self.debug:
+            LOG.debug('http_ffmpeg_file: ' + str(http_ffmpeg_file))
+        self._run_cmd(u'loadfile', http_ffmpeg_file, append)
 
     def loadlist(self, file_, append=None):
         '''Load the given playlist file,stopping playback of the current file.

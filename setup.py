@@ -8,7 +8,7 @@ setup(
         'pyee'
     ],
     url='https://github.com/JarbasAl/py_mplayer',
-    license='MIT',
+    license='MIT + Apache-2.0',
     author='jarbasAi',
     author_email='',
     description='mplayer python api'

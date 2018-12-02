@@ -1,9 +1,12 @@
 from py_mplayer.log import LOG
 from subprocess import Popen, PIPE
-from Queue import Queue
+from queue import Queue
 import sys
 from pyee import EventEmitter
 import threading
+from urllib.request import Request
+from urllib.request import urlopen
+from re import sub
 
 
 class BaseMplayerCtrlException(Exception):
@@ -72,10 +75,16 @@ class MplayerStdoutEvents(threading.Thread):
                     self.mpc.ee.emit("mplayer_media_finished", {})
                     media = False
                     continue
+            elif 'icy info' in line.lower():
+                if not media:
+                    self.mpc.ee.emit("mplayer_media_started", {"data": line.rstrip()})
+                    media = True
+                    continue
             elif line.lower() == 'starting playback...\n':
-                self.mpc.ee.emit("mplayer_media_started", {})
-                media = True
-                continue
+                if not media:
+                    self.mpc.ee.emit("mplayer_media_started", {})
+                    media = True
+                    continue
             else:
                 if line.upper().startswith('ANS_') and '=' in line:
                     self.queue.put_nowait(line)
@@ -721,7 +730,7 @@ class MplayerCtrl(object):
             return fset
 
         # defining the properties
-        for mprop, prop_dict in cls.PROPERTIES.iteritems():
+        for mprop, prop_dict in cls.PROPERTIES.items():
             pdoc, pname = prop_dict['doc'], prop_dict['name']
             fget = property_getter(mprop)  # mprop != unicode
             # (in ascii range that's ok)
@@ -770,7 +779,7 @@ class MplayerCtrl(object):
             args.extend(mplayer_args)
         else:
             args = [self.mplayer_path, '-slave',
-                    '-noconsolecontrols', '-nofontconfig', '-idle',
+                    '-noconsolecontrols', '-idle',
                     '-msglevel', 'all=4']
         # required args
         for tup in [('-vo', self.VO_DRIVER), ('-ao', self.AO_DRIVER),
@@ -787,7 +796,7 @@ class MplayerCtrl(object):
             args.append(media_file)
 
         if self._process is None:
-            args = [unicode(arg).encode(sys.getfilesystemencoding())
+            args = [str(arg).encode(sys.getfilesystemencoding())
                     for arg in filter(None, args)]
             self.args = args
             try:
@@ -796,7 +805,7 @@ class MplayerCtrl(object):
                 self._process = Popen(args, stdin=PIPE, stdout=PIPE,
                                       stderr=PIPE, universal_newlines=True,
                                       startupinfo=self.STARTUPINFO)
-            except Exception, e:
+            except Exception as e:
                 LOG.error(e)
                 raise BuildProcessError(str(e))
             self._stdin = self._process.stdin
@@ -816,7 +825,10 @@ class MplayerCtrl(object):
     # own events
     def on_media_started(self, evt):
         self.playing = True
-        LOG.info("media started")
+        if evt.get('data') is None:
+            LOG.info("media started")
+        else:
+            LOG.info("media started: " + str(evt['data']))
 
     def on_media_finished(self, evt):
         self.playing = False
@@ -840,7 +852,7 @@ class MplayerCtrl(object):
         if not self.process_alive:
             raise NoMplayerRunning('You have first to start the mplayer,'
                                    'use Start()')
-        args = u' '.join(unicode(i).replace(u' ', u'\\ ')
+        args = u' '.join(str(i).replace(u' ', u'\\ ')
                          for i in args if not i is None)
         args.replace(u'\\', u'\\\\')  # escape escaped backslashes :D
         if self.debug:
@@ -850,9 +862,9 @@ class MplayerCtrl(object):
             stostdin = u'pausing_keep %s %s\n\n' % (cmd, args)
         else:
             stostdin = u'%s %s\n\n' % (cmd, args)
-        stostdin = stostdin.encode(sys.getfilesystemencoding())
 
         self._stdin.write(stostdin)
+        self._stdin.flush()
 
     def _get_from_queue(self):
         if self.playing:
@@ -1087,7 +1099,13 @@ class MplayerCtrl(object):
         '''Load the given file/URL, stopping playback of the current file/URL.
         If <append> is nonzero playback continues and the file/URL is
         appended to the current playlist instead.'''
-        self._run_cmd(u'loadfile', file_url, append)
+        # check for any redirects
+        file = urlopen(Request(file_url, data=None, 
+                               headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11'}))
+        http_ffmpeg_file = sub('https', 'ffmpeg://https', file.geturl())
+        if self.debug:
+            LOG.debug('http_ffmpeg_file: ' + str(http_ffmpeg_file))
+        self._run_cmd(u'loadfile', http_ffmpeg_file, append)
 
     def loadlist(self, file_, append=None):
         '''Load the given playlist file,stopping playback of the current file.
@@ -1169,7 +1187,6 @@ class MplayerCtrl(object):
         otherwise False'''
         if self.process_alive:
             self._run_cmd(u'quit')
-            self._stdin.flush()
             if sys.version_info[:2] > (2, 5):
                 self._process.terminate()
                 if self.process_alive:
